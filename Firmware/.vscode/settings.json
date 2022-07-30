@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "io.h": "c",
+        "eeprom.h": "c"
+    },
+    "files.exclude": {
+        "**/.out": true,
+        "**/.vscode": false,
+        "**/dep": true,
+        "**/*.eep": true,
+        "**/*.elf": true,
+        "**/*.hex": true,
+        "**/*.lss": true,
+        "**/*.map": true,
+        "**/*.o": true,
+	    "**/Makefile": false,
+	    "**/*.pdsprj": true,
+	    "**/*.pdsbak": true,
+	    "**/*.workspace": true
+    }
+}
