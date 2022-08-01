@@ -32,9 +32,6 @@ extern uint8_t s_lcd_mode, s_adc_mvpc, s_adc_mapc;
 extern uint8_t g_mnu_keyhold;
 extern uint32_t g_mnu_mstimer;
 
-extern uint16_t xxx;
-
-
 void SetDisplayMode(uint8_t mode) {
 	//LCD_send_command(hrev ? 0xA9 : 0xA8); // swap ram msb/lsb order (A8, A9)
 	//LCD_send_command(hrev ? 0xAB : 0xAA); // vertical or horizontal mode (AA, AB)
@@ -87,11 +84,11 @@ void FormatTime(char* buffer, uint32_t ms) {
 		ms -= 1000U;
 		ss++;
 	}
-	FormatNumberW(buffer + 0, hh, 2, '0');
+	FormatNumber(buffer + 0, hh, 2, '0');
 	buffer[2] = ':';
-	FormatNumberW(buffer + 3, mm, 2, '0');
+	FormatNumber(buffer + 3, mm, 2, '0');
 	buffer[5] = ':';
-	FormatNumberW(buffer + 6, ss, 2, '0');
+	FormatNumber(buffer + 6, ss, 2, '0');
 	buffer[8] = '\0';
 }
 
@@ -122,8 +119,8 @@ void ShowMenu_ADCOptions() {
 	while (1) {
 		//FormatADC3(menu_subt + 6, *pnval, nmin, nmax, dmax, ')');
 		//FormatNumberW(menu_subt + 1, *pnval, 4, '0');
-		FormatNumberW(item_mvpc + 10, mvpc, 2, '.');
-		FormatNumberW(item_mapc + 10, mapc, 2, '.');
+		FormatNumber(item_mvpc + 10, mvpc, 2, '.');
+		FormatNumber(item_mapc + 10, mapc, 2, '.');
 
 		LCD_clear_screen();
 		LCD_draw_string(" Measure Options");
@@ -132,10 +129,10 @@ void ShowMenu_ADCOptions() {
 
 		switch (menucur = ShowMenu(menu_items, 3, 2, menucur)) {
 			case 0:
-				mvpc = SetNumberOptionW(item_mvpc, 10, 2, 2, mvpc, 0, 64, 2, 5);
+				mvpc = SetNumberOption(item_mvpc, 10, 2, 2, mvpc, 0, 64, 2, 5);
 				break;
 			case 1:
-				mapc = SetNumberOptionW(item_mapc, 10, 2, 3, mapc, 0, 64, 2, 5);
+				mapc = SetNumberOption(item_mapc, 10, 2, 3, mapc, 0, 64, 2, 5);
 				break;
 			default:
 				s_adc_mvpc = mvpc;
@@ -145,19 +142,19 @@ void ShowMenu_ADCOptions() {
 	}
 }
 
-void ShowMenu_LoadOptions() {
+void ShowMenu_SystemOptions() {
 	static char item_vmin[]	= "Vmin,mv..XXXXX";
 	static const char* menu_items[] = { item_vmin, "Return" };
 	uint16_t vmin = s_off_vmin;
 	uint8_t menucur = 0;
 	while (1) {
-		FormatNumberW(item_vmin + 9, vmin, 5, '.');
+		FormatNumber(item_vmin + 9, vmin, 5, '.');
 		LCD_clear_screen();
-		LCD_draw_string(" Load Options");
+		LCD_draw_string(" System Options");
 
 		switch (menucur = ShowMenu(menu_items, 2, 2, menucur)) {
 			case 0:
-				vmin = SetNumberOptionW(item_vmin, 9, 5, 2, vmin, 0, 50000, 25, 250);
+				vmin = SetNumberOption(item_vmin, 9, 5, 2, vmin, 0, 65000, 50, 500);
 				break;
 			default:
 				s_off_vmin = vmin;
@@ -207,7 +204,7 @@ void ShowMenu_Display() {
 // main menu function
 void ShowMenu_Options() {
 	static const char* menu_title = " Options";
-	static const char* menu_items[] = { "Display..", "Load..", "Measure..", "Save", "Return" };
+	static const char* menu_items[] = { "System..", "Display..", "Measure..", "Save", "Return" };
 	uint8_t menucur = 0;
 
 	while (1) {
@@ -216,10 +213,10 @@ void ShowMenu_Options() {
 
 		switch (menucur = ShowMenu(menu_items, 5, 2, menucur)) {
 			case 0:
-				ShowMenu_Display();
+				ShowMenu_SystemOptions();
 				break;
 			case 1:
-				ShowMenu_LoadOptions();
+				ShowMenu_Display();
 				break;
 			case 2:
 				ShowMenu_ADCOptions();
@@ -429,7 +426,7 @@ int main() {
 			LCD_draw_string(buffer);
 
 			// draw discharged capacity
-			buffer[PutText(buffer, "mAh", FormatNumberW(buffer + 0, capacity / 3600, 6, ' '))] = '\0';
+			buffer[PutText(buffer, "mAh", FormatNumber(buffer + 0, capacity / 3600, 6, ' '))] = '\0';
 			//buffer[PutText(buffer, "mAh", FormatNumberW(buffer + 0, xxx, 6, ' '))] = '\0';
 			LCD_draw_string(buffer);
 
@@ -439,13 +436,13 @@ int main() {
 
 		if (s_lcd_mode & DISPLAY_RAWD) {
 			if (refreshmask & REFRESH_OUTV) { // outv value raw
-				FormatNumberW(buffer + 0, rawv, 4, '0');
+				FormatNumber(buffer + 0, rawv, 4, '0');
 				buffer[4] = '\0';
 				LCD_set_position(0 * 6, 5);
 				LCD_draw_string(buffer);
 			}
 			if (refreshmask & REFRESH_OUTC) { // outc value raw
-				FormatNumberW(buffer + 0, adjustimer ? adjc : rawc, 4, '0');
+				FormatNumber(buffer + 0, adjustimer ? adjc : rawc, 4, '0');
 				buffer[4] = '\0';
 				LCD_set_position(12 * 6, 5);
 				LCD_draw_string(buffer);

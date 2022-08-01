@@ -5,11 +5,38 @@
  *****************************************************************************/
 
 #include <avr\io.h>
-//#include <util\delay.h>
 #include <avr\interrupt.h>
 #include "config.h"
 #include "LCD8814.h"
 #include "menu.h"
+
+#ifndef KEYBOARD_PORT
+	#error KEYBOARD_PORT must be defined in configuration file
+#endif
+#ifndef KEYBOARD_DDRS
+	#error KEYBOARD_DDRS must be defined in configuration file
+#endif
+#ifndef KEYBOARD_PINS
+	#error KEYBOARD_PINS must be defined in configuration file
+#endif
+#ifndef KEYBOARD_PIN_UP
+	#error KEYBOARD_PIN_UP must be defined in configuration file
+#endif
+#ifndef KEYBOARD_PIN_OK
+	#error KEYBOARD_PIN_OK must be defined in configuration file
+#endif
+#ifndef KEYBOARD_PIN_DN
+	#error KEYBOARD_PIN_DN must be defined in configuration file
+#endif
+#ifndef BUZZER_PORT
+	#error BUZZER_PORT must be defined in configuration file
+#endif
+#ifndef BUZZER_DDRS
+	#error BUZZER_DDRS must be defined in configuration file
+#endif
+#ifndef BUZZER_PIN
+	#error BUZZER_PIN must be defined in configuration file
+#endif
 
 // Currently pressed or released key code or zero otherwise
 uint8_t g_mnu_lastkey = 0;
@@ -19,9 +46,6 @@ uint8_t g_mnu_keyhold = 0;
 volatile uint16_t g_mnu_buzzing = 0;
 // Milliseconds resolution counter, lasting 49.17:02:47.296
 volatile uint32_t g_mnu_mstimer = 0;
-
-void UI_Clock() {
-}
 
 ISR(TIMER0_OVF_vect) { // to adjust period modify TCNT0
 	static uint16_t msfrac; // intermediate fractions to mitigate timer 0xff overflow
@@ -47,13 +71,11 @@ void UI_Sleep(uint16_t ms) {
 }
 
 void UI_Idle() {
- 	static uint32_t last;
-	
+ 	static uint32_t last;	
 	// uint16_t rest = KEY_POLL_DELAY - (uint16_t)(g_mnu_mstimer - last); // 7376
 	// if (rest < KEY_POLL_DELAY) {
 	// 	UI_Sleep(rest);
-	// }
-	
+	// }	
  	while (KEY_POLL_DELAY > (uint16_t)(g_mnu_mstimer - last)) {
  		asm("nop");
  	}
@@ -69,34 +91,6 @@ void UI_Buzz(uint16_t ms) {
 }
 
 void UI_Initialize() {
-	#ifndef KEYBOARD_PORT
-		#error KEYBOARD_PORT must be defined in config.h
-	#endif
-	#ifndef KEYBOARD_DDRS
-		#error KEYBOARD_DDRS must be defined in config.h
-	#endif
-	#ifndef KEYBOARD_PINS
-		#error KEYBOARD_PINS must be defined in config.h
-	#endif
-	#ifndef KEYBOARD_PIN_UP
-		#error KEYBOARD_PIN_UP must be defined in config.h
-	#endif
-	#ifndef KEYBOARD_PIN_OK
-		#error KEYBOARD_PIN_OK must be defined in config.h
-	#endif
-	#ifndef KEYBOARD_PIN_DN
-		#error KEYBOARD_PIN_DN must be defined in config.h
-	#endif
-	#ifndef BUZZER_PORT
-		#error BUZZER_PORT must be defined in config.h
-	#endif
-	#ifndef BUZZER_DDRS
-		#error BUZZER_DDRS must be defined in config.h
-	#endif
-	#ifndef BUZZER_PIN
-		#error BUZZER_PIN must be defined in config.h
-	#endif
-
 	// keyboard inputs
 	KEYBOARD_DDRS &= ~(_BV(KEYBOARD_PIN_UP) | _BV(KEYBOARD_PIN_DN) | _BV(KEYBOARD_PIN_OK)); // input directions
 	KEYBOARD_PORT = _BV(KEYBOARD_PIN_UP) | _BV(KEYBOARD_PIN_DN) | _BV(KEYBOARD_PIN_OK); // internal pullup
@@ -106,7 +100,7 @@ void UI_Initialize() {
 	BUZZER_PORT &= ~_BV(BUZZER_PIN);
 
 	// system timer configuration
-	TCCR0 = _BV(CS01);  // T0 prescaler CS00-CS02: 0:stop 1:1 2:8 3:64 4:256 5:1024 6:T0pin-fall 7:T0pin-rise
+	TCCR0 = _BV(CS01);  // T0 prescaler CS00-CS02: 0-7:stop,1,8,64,256,1024,T0-pin-fall,T0-pin-rise
 	TIMSK = _BV(TOIE0); // T0 overflow interrupt
 }
 
@@ -151,39 +145,21 @@ uint8_t ScanKeys() {
             : g_mnu_keyhold < 2 ? KEY_PRESSED : 0 : 0);
 }
 
-// Returns value accelerated increment or decrement amount for different key holding timings
-uint8_t GetKeyAcceleration(uint8_t speed2, uint8_t speed3) {
-	if (g_mnu_keyhold == 0x01) {
-		return 1;
-	}
+uint16_t GetKeyAcceleration(uint16_t speed2, uint16_t speed3) {
 	if (g_mnu_keyhold == 0xff) {
-		return speed3;
+		g_mnu_keyhold = 0xfb;
 	}
-	if (g_mnu_keyhold == 0x00) {
-		return 0;
-	}
-	if (g_mnu_keyhold & 0x03) {
-		return 0;
-	}
-	if (g_mnu_keyhold >= 0x24) {
-		return speed3;
-	}
-	if (g_mnu_keyhold >= 0x14) {
-		return speed2;
-	}
-	return 1;
-	//return g_key_holding > 0x20 ? speed3 : g_key_holding > 0x10 ? speed2 : g_key_holding > 0 ? 1 : 0;
+	uint8_t hold = g_mnu_keyhold - 1; // 0x20 0x10 - four tick, 0x28 0x14 - five ticks switching
+	return hold & 0x03 ? 0 : hold >= 0x28 ? speed3 : hold >= 0x14 ? speed2 : 1;
 }
 
-// Returns value accelerated increment bounded result for different key holding timings
-uint16_t AcceleratedIncrement(uint16_t value, uint16_t maximum, uint8_t speed2, uint8_t speed3) {
-	uint8_t inc = GetKeyAcceleration(speed2, speed3);
+uint16_t AcceleratedIncrement(uint16_t value, uint16_t maximum, uint16_t speed2, uint16_t speed3) { //7400
+	uint16_t inc = GetKeyAcceleration(speed2, speed3);
 	return maximum - value > inc ? value + inc : maximum;
 }
 
-// Returns value accelerated decrement bounded result for different key holding timings
-uint16_t AcceleratedDecrement(uint16_t value, uint16_t minimum, uint8_t speed2, uint8_t speed3) {
-	uint8_t dec = GetKeyAcceleration(speed2, speed3);
+uint16_t AcceleratedDecrement(uint16_t value, uint16_t minimum, uint16_t speed2, uint16_t speed3) {
+	uint16_t dec = GetKeyAcceleration(speed2, speed3);
 	return value - minimum > dec ? value - dec : minimum;
 }
 
@@ -217,20 +193,7 @@ uint8_t ShowMenu(const char** items, uint8_t count, uint8_t top, uint8_t cursor)
 	}
 }
 
-uint8_t FormatNumber(char* buff, uint8_t value, uint8_t options) {
-	uint8_t i = 0;
-	if (options > 2) {
-		buff[i++] = '0' + value / 100;
-	}
-	if (options > 1) {
-		buff[i++] = '0' + (value % 100) / 10;
-	}
-	buff[i++] = '0' + (value % 10);	
-	
-	return i;
-}
-
-uint8_t FormatNumberW(char* buff, uint16_t value, uint8_t width, char filler) {
+uint8_t FormatNumber(char* buff, uint16_t value, uint8_t width, char filler) {
 	uint8_t pos = 0;
 	for (int8_t pow = 4; pow >= 0; pow -= 1) {
 		uint16_t div = pow > 3 ? 10000 : pow > 2 ? 1000 : pow > 1 ? 100 : pow > 0 ? 10 : 1;
@@ -248,10 +211,8 @@ uint8_t FormatNumberW(char* buff, uint16_t value, uint8_t width, char filler) {
 	return pos;
 }
 
-uint16_t SetNumberOptionW(char* buffer, uint8_t offset, uint8_t width, uint8_t ypos,
- 		uint16_t value, uint16_t minimum, uint16_t maximum, uint8_t speed2, uint8_t speed3) {
-	//uint8_t speed2 = (maximum < 0x100) ? 2 : 5;
-	//uint8_t speed3 = (maximum < 0x100) ? 5 : 25;
+uint16_t SetNumberOption(char* buffer, uint8_t offset, uint8_t width, uint8_t ypos,
+ 		uint16_t value, uint16_t minimum, uint16_t maximum, uint16_t speed2, uint16_t speed3) {
 
 	for (uint8_t i = 0;; ++i) {
 		switch(ScanKeys()) {
@@ -269,7 +230,7 @@ uint16_t SetNumberOptionW(char* buffer, uint8_t offset, uint8_t width, uint8_t y
 
 		LCD_set_position(0, ypos);
 		LCD_draw_char(i & 0x08 ? ' ' : '*');
-		FormatNumberW(buffer + offset, value, width, '.');
+		FormatNumber(buffer + offset, value, width, '.');
 		LCD_draw_string(buffer);
 		UI_Idle();
 	}

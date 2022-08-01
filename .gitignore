@@ -5,5 +5,5 @@ Firmware/*.hex
 Firmware/*.lss
 Firmware/*.map
 Firmware/dep/
-*.pdsbak
-*.workspace
+Proteus/*.pdsbak
+Proteus/*.workspace
