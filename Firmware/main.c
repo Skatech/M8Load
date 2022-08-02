@@ -1,3 +1,5 @@
+//#define SIMULATION
+
 #include <avr\io.h>
 #include <avr\interrupt.h>
 #include <avr/sleep.h>
@@ -9,14 +11,6 @@
 #include "settings.h"
 #include "LCD8814.h"
 #include "menu.h"
-
-#define SIMULATION
-
-// display mode flags
-#define DISPLAY_VREV 0x01
-#define DISPLAY_INVR 0x02
-#define DISPLAY_HREV 0x04
-#define DISPLAY_RAWD 0x08
 
 // main screen menu modes
 #define MSMMODE_NORM	0x00
@@ -143,54 +137,56 @@ void ShowMenu_ADCOptions() {
 }
 
 void ShowMenu_SystemOptions() {
-	static char item_vmin[]	= "Vmin,mv..XXXXX";
-	static const char* menu_items[] = { item_vmin, "Return" };
-	uint16_t vmin = s_off_vmin;
+	static char item_voff[]	= "Voff,mv..XXXXX";
+	static char item_fcal[]	= "Fcalibr....XXX";
+	static const char* menu_items[] = { item_voff, item_fcal, "Return" };
+	uint16_t voff = s_off_vmin;
+	uint8_t fcal = OSCCAL;
 	uint8_t menucur = 0;
 	while (1) {
-		FormatNumber(item_vmin + 9, vmin, 5, '.');
+		FormatNumber(item_voff + 9, voff, 5, '.');
+		FormatNumber(item_fcal + 11, fcal, 3, '.');
 		LCD_clear_screen();
 		LCD_draw_string(" System Options");
 
-		switch (menucur = ShowMenu(menu_items, 2, 2, menucur)) {
+		switch (menucur = ShowMenu(menu_items, 3, 2, menucur)) {
 			case 0:
-				vmin = SetNumberOption(item_vmin, 9, 5, 2, vmin, 0, 65000, 50, 500);
+				voff = SetNumberOption(item_voff, 9, 5, 2, voff, 0, 65000, 50, 500);
+				break;
+			case 1:
+				fcal = SetNumberOption(item_fcal, 11, 3, 3, fcal, 0x00, 0xFF, 5, 25);
 				break;
 			default:
-				s_off_vmin = vmin;
+				s_off_vmin = voff;
+				OSCCAL = fcal;
 			 	return;
 		}
 	}
 }
 
 void ShowMenu_Display() {
-	static char item_hrev[]		= "Horizontal.XXX";
 	static char item_rawd[]		= "Rawdata....XXX";
 	static char item_vrev[] 	= "V-Reverse..XXX";
 	static char item_invr[]		= "Inversion..XXX";
-	static const char* menu_items[] = { item_hrev, item_rawd, item_vrev, item_invr, "Return" };
+	static const char* menu_items[] = { item_rawd, item_vrev, item_invr, "Return" };
 	uint8_t disp = s_lcd_mode;
 	uint8_t menucur = 0;
 
 	while (1) {
-		FormatBooleanOption(item_hrev + 11, disp & DISPLAY_HREV);
 		FormatBooleanOption(item_vrev + 11, disp & DISPLAY_VREV);
 		FormatBooleanOption(item_invr + 11, disp & DISPLAY_INVR);
 		FormatBooleanOption(item_rawd + 11, disp & DISPLAY_RAWD);
 		LCD_clear_screen();
 		LCD_draw_string("Display Options");
 
-		switch (menucur = ShowMenu(menu_items, 5, 2, menucur)) {
-			case 0:				
-				disp ^= DISPLAY_HREV;
-				break;
-			case 1:
+		switch (menucur = ShowMenu(menu_items, 4, 2, menucur)) {
+			case 0:
 				disp ^= DISPLAY_RAWD;
 				break;
-			case 2:
+			case 1:
 				disp ^= DISPLAY_VREV;
 				break;
-			case 3:
+			case 2:
 				disp ^= DISPLAY_INVR;
 				break;
 			default:
@@ -287,9 +283,9 @@ int main() {
 
 	uint8_t eeloaded = EEPROM_LoadSettings();
 
-	#ifdef SIMULATION
-		s_lcd_mode = DISPLAY_VREV | DISPLAY_HREV | DISPLAY_RAWD;
-	#endif
+	// #ifdef SIMULATION
+	// 	s_lcd_mode = DISPLAY_VREV | DISPLAY_HREV | DISPLAY_RAWD;
+	// #endif
 
 	// initialize LCD
 	LCD_initialize();
@@ -305,7 +301,7 @@ int main() {
 	LCD_set_position(3 * 6, 4);
 	LCD_draw_string("Research Lab");
 	LCD_set_position(0 * 6, 7);
-	LCD_draw_string("2022.07.30 v0.50");
+	LCD_draw_string(FIRMWARE_VERSION);
 
 	UI_Initialize();
 	sei();
