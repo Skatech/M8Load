@@ -12,13 +12,11 @@
 #include "LCD8814.h"
 #include "menu.h"
 
-// main screen menu modes
 #define MSMMODE_NORM	0x00
 #define MSMMODE_ADJV	0x01
 #define MSMMODE_ADJC	0x02
-#define MSM_ADJDELAY	80
+#define MSM_ADJDELAY	60
 
-// Persistent settigns varibles
 extern uint16_t s_off_vmin;
 extern uint8_t s_lcd_mode, s_adc_mvpc, s_adc_mapc;
 
@@ -27,11 +25,8 @@ extern uint8_t g_mnu_keyhold;
 extern uint32_t g_mnu_mstimer;
 
 void SetDisplayMode(uint8_t mode) {
-	//LCD_send_command(hrev ? 0xA9 : 0xA8); // swap ram msb/lsb order (A8, A9)
-	//LCD_send_command(hrev ? 0xAB : 0xAA); // vertical or horizontal mode (AA, AB)
-	//LCD_send_command((mode & DISPLAY_HREV) ? 0xA9 : 0xA1); // horizontal reverse (A1, A9)
-	LCD_send_command((mode & DISPLAY_VREV) ? 0xC8 : 0xC0); // display vertical reverse (C7, C8)
-	LCD_send_command((mode & DISPLAY_INVR) ? 0xA7 : 0xA6); // positive mode (A6, A7)
+	LCD_send_command((mode & DISPLAY_VREV) ? LCD8814_VREV_ON : LCD8814_VREV_OFF);
+	LCD_send_command((mode & DISPLAY_INVR) ? LCD8814_INVR_ON : LCD8814_INVR_OFF);
 }
 
 void LCD_DrawString14X24(const char* text, uint8_t xpos, uint8_t ypos);
@@ -169,31 +164,31 @@ void ShowMenu_Display() {
 	static char item_vrev[] 	= "V-Reverse..XXX";
 	static char item_invr[]		= "Inversion..XXX";
 	static const char* menu_items[] = { item_rawd, item_vrev, item_invr, "Return" };
-	uint8_t disp = s_lcd_mode;
-	uint8_t menucur = 0;
+	uint8_t cursor = 0, lcdmode = s_lcd_mode;
 
 	while (1) {
-		FormatBooleanOption(item_vrev + 11, disp & DISPLAY_VREV);
-		FormatBooleanOption(item_invr + 11, disp & DISPLAY_INVR);
-		FormatBooleanOption(item_rawd + 11, disp & DISPLAY_RAWD);
+		FormatBooleanOption(item_vrev + 11, lcdmode & DISPLAY_VREV);
+		FormatBooleanOption(item_invr + 11, lcdmode & DISPLAY_INVR);
+		FormatBooleanOption(item_rawd + 11, lcdmode & DISPLAY_RAWD);
 		LCD_clear_screen();
 		LCD_draw_string("Display Options");
 
-		switch (menucur = ShowMenu(menu_items, 4, 2, menucur)) {
+		switch (cursor = ShowMenu(menu_items, 4, 2, cursor)) {
 			case 0:
-				disp ^= DISPLAY_RAWD;
+				lcdmode ^= DISPLAY_RAWD;
 				break;
 			case 1:
-				disp ^= DISPLAY_VREV;
+				lcdmode ^= DISPLAY_VREV;
 				break;
 			case 2:
-				disp ^= DISPLAY_INVR;
+				lcdmode ^= DISPLAY_INVR;
 				break;
 			default:
-				SetDisplayMode(s_lcd_mode = disp);
-			 return;
+				//SetDisplayMode(s_lcd_mode = lcdmode);
+				s_lcd_mode = lcdmode;
+			 	return;
 		}
-		SetDisplayMode(disp);
+		SetDisplayMode(lcdmode);
 	}
 }
 
@@ -228,38 +223,35 @@ void ShowMenu_Options() {
 #define READINGS_TO_ACCUMULATE 600 // 600 * 2ch * 0.416ms = 0.5s
 
 uint32_t g_adcresv = 0, g_adcresc = 0;  // ADC resulting summs from READINGS_TO_ACCUMULATE readings
-uint32_t g_adcaccv = 0, g_adcaccc = 0; // ADC readings accumulators
-uint16_t g_adcaccscount = 0; // ADC accumulate readings counter
 uint8_t g_adcdeliveries = 0; // ADC unprocessed deliveries counter
 
-uint16_t AccumulatedReadingsToRaw(uint32_t accumulated) {
-	return (uint16_t)((accumulated + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE);
-}
-
-uint16_t AccumulatedReadingsToReal(uint32_t accumulated, uint8_t scale) {
-	return (uint16_t)((accumulated * scale + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE);
-}
+// 7410 7428 ==> 7482
+//  uint16_t __div_rounded(uint32_t* value, uint16_t divider) {
+//  	return (uint16_t)(((*value) + (divider / 2)) / divider);
+//  }
 
 ISR(ADC_vect) {
+	static uint32_t adcaccv = 0, adcaccc = 0; // ADC readings accumulators
+	static uint16_t adcacccount = 0; // ADC accumulate readings counter
 	switch (ADMUX & (ADMUX_CHANNELV | ADMUX_CHANNELC)) {
 		case ADMUX_CHANNELV:
 			ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELC;
-			g_adcaccc += ADC;
+			adcaccc += ADC;
 			break;
 
 		case ADMUX_CHANNELC:
 			ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELV;
-			g_adcaccv += ADC;
+			adcaccv += ADC;
 			break;
 	}
 
-	if (++g_adcaccscount == 2 * READINGS_TO_ACCUMULATE) {
-		g_adcresv = g_adcaccv;
-		g_adcresc = g_adcaccc;
+	if (++adcacccount == 2 * READINGS_TO_ACCUMULATE) {
+		g_adcresv = adcaccv;
+		g_adcresc = adcaccc;
 		g_adcdeliveries++;
 
-		g_adcaccscount = 0x00;
-		g_adcaccv = g_adcaccc = 0x00;
+		adcacccount = 0x0000;
+		adcaccv = adcaccc = 0x00000000;
 	}
 }
 
@@ -268,6 +260,7 @@ ISR(ADC_vect) {
 #define REFRESH_ADJV	0x04
 #define REFRESH_ADJC	0x08
 #define REFRESH_CNTX	0x10
+#define REFRESH_FULL 	REFRESH_OUTV | REFRESH_OUTC | REFRESH_ADJV |REFRESH_ADJC | REFRESH_CNTX
 
 // #define REFRESH_FLSU	0x10 // flashing updated ???
 // #define REFRESH_FLSV	0x20 // flashing visible
@@ -275,25 +268,30 @@ ISR(ADC_vect) {
 // #define REFRESH_STBV	0x80 // stabilizing mode marker visible
 
 int main() {
-	uint16_t outv = 0, outc = 0, adjc = 0/*, adjv = 0, ccount = 0*/;
-	uint16_t rawv = outv, rawc = outc;
-	uint8_t adjustimer = 0, /*msmmode = 0,*/ turnedon = 0, refreshmask = 0xff;
-	uint32_t lastmillis = 0, capacity = 0;
+	uint16_t rawv = 0; // Last measured voltage in ADC counts
+	uint16_t outv = 0; // Last measured voltage in millivolts
+	uint16_t rawc = 0; // Last measured current in ADC counts
+	uint16_t outc = 0; // Last measured current in millivolts
+	uint16_t adjc = 0; // Output current seting in ADC counts
+
+	uint8_t adjustctd = 0; // Current adjust mode delay counter in KEY_POLL_DELAY periods
+	uint8_t turnedon = 0; // Output state flag
+	uint8_t refreshflags = REFRESH_FULL; // User interface elements requres refresh flags
+	uint32_t lastcount = 0;	// Last capacity update time
+	uint32_t capacity = 0;	// Discharged capacity counter
+
 	char buffer[20];
 
-	uint8_t eeloaded = EEPROM_LoadSettings();
-
-	// #ifdef SIMULATION
-	// 	s_lcd_mode = DISPLAY_VREV | DISPLAY_HREV | DISPLAY_RAWD;
-	// #endif
+	uint8_t eeperr = EEPROM_LoadSettings();
+	//s_lcd_mode |= DISPLAY_RAWD;
 
 	// initialize LCD
 	LCD_initialize();
-	SetDisplayMode(/*s_lcd_mode == 0xFF ? s_lcd_mode = 0 :*/ s_lcd_mode);
+	SetDisplayMode(s_lcd_mode);
 	LCD_clear_screen();
 
 	// draw title screen
-	if (eeloaded == EEPROM_ERROR_INCOMPATIBLE_VERSION) {
+	if (eeperr) {
 		LCD_draw_string("DEFAULT SETTINGS");
 	}
 	LCD_set_position(1 * 6, 3);
@@ -306,10 +304,10 @@ int main() {
 	UI_Initialize();
 	sei();
 	UI_Buzz(500);
-	UI_Sleep(1500);
+	UI_Sleep(2000);
 	LCD_clear_screen();
 
-	// adc setup Tconv = F_CPU / PRESCALE / 13 (2404 reads per sec)
+	// ADC setup Tconv = F_CPU / PRESCALE / 13 (2404 reads per sec)
 	ADCSRA = _BV(ADIE) | _BV(ADFR) | _BV(ADEN) | _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); // ADC interupt, free mode, ADC enabled, prescaler CK/128
 	ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELV; // reference 2.56V, input A0
 	ADCSRA |= (_BV(ADSC)); // start conversion
@@ -319,54 +317,100 @@ int main() {
     TCCR1A = _BV(WGM10) | _BV(WGM11) | _BV(COM1B1) | _BV(COM1A1); //OC1A, OC1B pins - low level on compare match
 	TCCR1B = _BV(CS10) | _BV(WGM12); //start timer-counter with no prescaling
 
-
 	// main loop
 	for (;;) {
-		if (g_adcdeliveries) {
-			uint16_t v = AccumulatedReadingsToReal(g_adcresv, s_adc_mvpc);
-			if (v != outv) {
-				outv = v;
-				rawv = AccumulatedReadingsToRaw(g_adcresv);
-				refreshmask = refreshmask | REFRESH_OUTV;
-			}
+		// process user input 
+		switch (ScanKeys()) {
+			case KEY_OK:
+				if (g_mnu_keyhold > 20) {
+					ShowMenu_Options();
+					LCD_clear_screen();
+					refreshflags |= REFRESH_FULL;
+					UI_Buzz(50);
+				}
+				break;
 
-			uint16_t c = AccumulatedReadingsToReal(g_adcresc, s_adc_mapc);
-			if (c != outc) {
-				outc = c;
-				rawc = AccumulatedReadingsToRaw(g_adcresc);
-				refreshmask = refreshmask | REFRESH_OUTC;
-			}
+			case KEY_RELEASED_OK:
+				if (turnedon) {
+					turnedon = 0;
+					UI_Buzz(50);
+				}
+				else {
+					g_mnu_mstimer = lastcount = capacity = 0;
+					turnedon = 1;
+					UI_Buzz(250);
+				}
+				refreshflags |= REFRESH_CNTX;
+				break;
 
-			g_adcdeliveries = 0x00;
+			case KEY_UP:
+			case KEY_PRESSED_UP:
+				adjc = AcceleratedIncrement(adjc, 1000, 5, 25);
+				adjustctd = MSM_ADJDELAY;
+				refreshflags |= REFRESH_OUTC;
+				break;
+
+			case KEY_DN:
+			case KEY_PRESSED_DN:
+				adjc = AcceleratedDecrement(adjc, 0, 5, 25);
+				adjustctd = MSM_ADJDELAY;
+				refreshflags |= REFRESH_OUTC;
+				break;
 		}
 
-		if (turnedon) {
-			if (g_mnu_mstimer - lastmillis >= 1000) {
-				lastmillis += 1000;
-				//CALCULATE TIME MORE PRECISLY using really elapsed secs!!!!!!!!!!!!!!!!!!!!!!!
-				//Move increment closer to current update code !!!!!!!!!!!!!!!!!!!!!!!!
-				capacity += outc; // capacity ma/sec  
-				refreshmask |= REFRESH_CNTX;
+		if (g_adcdeliveries) {
+			g_adcdeliveries = 0x00;
+
+			uint16_t v = (g_adcresv * s_adc_mvpc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+			if (v != outv) {
+				outv = v;
+				rawv = (g_adcresv + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+				refreshflags = refreshflags | REFRESH_OUTV;
 			}
+
+			uint16_t c = (g_adcresc * s_adc_mapc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+			if (c != outc) {
+				outc = c;
+				rawc = (g_adcresc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+				refreshflags = refreshflags | REFRESH_OUTC;
+			}
+
+			if (turnedon) {
+				uint32_t passedms = lastcount;
+				cli();
+				lastcount = g_mnu_mstimer;
+				sei();
+				passedms = lastcount - passedms;
+
+				capacity += (passedms * outc + 500) / 1000; // capacity ma/sec
+				refreshflags |= REFRESH_CNTX;
+			}
+		}
+
+		// turn off by input voltage low bound
+		if (turnedon) {
 			if (s_off_vmin > outv) {
 				turnedon = 0;
-				refreshmask |= REFRESH_CNTX;
+				refreshflags |= REFRESH_CNTX;
 				UI_Buzz(2500);
 			}
 		}
 
-		if (turnedon) {
-			if (OCR1B != adjc) {
-				OCR1B = adjc;
-			}
+		// update output current regulation register
+		for (uint16_t crval = turnedon ? adjc : 0; crval != OCR1B;) {
+			OCR1B = crval;
 		}
-		else {
-			if (OCR1B != 0) {
-				OCR1B = 0;
+
+		// release current set value indication
+		if (adjustctd) {
+			adjustctd--;
+			if (adjustctd == 0) {
+				refreshflags |= REFRESH_OUTC;
+				UI_Buzz(25);
 			}
 		}
 
-		if (refreshmask & REFRESH_OUTV) {
+		if (refreshflags & REFRESH_OUTV) {
 			LCD_set_position(1, 0);
 			LCD_draw_string("VOLTAGE");
 
@@ -378,7 +422,7 @@ int main() {
 				LCD_DrawString14X32(buffer, 0, 1);
 			//}
 		}
-		if (refreshmask & REFRESH_OUTC) {
+		if (refreshflags & REFRESH_OUTC) {
 			LCD_set_position(54, 0);
 			LCD_draw_string("CURRENT");
 
@@ -387,125 +431,48 @@ int main() {
 			// }
 			//else {
 
-				FormatADC3(buffer, adjustimer ? adjc * s_adc_mapc : outc, '\0');
+				FormatADC3(buffer, adjustctd ? adjc * s_adc_mapc : outc, '\0');
 				LCD_DrawString14X32(buffer, 50, 1);
 			//}
 		}
 
-		// // stabilizing marker
-		// if (refresh & REFRESH_STBU) {
-		// 	LCD_set_position(34, 5);
-		// 	if (stbmode) { // limiting curent
-		// 		if (refresh & REFRESH_STBV) {
-		// 			LCD_draw_string("LIMIT");
-		// 			UI_Buzz(2000);
-		// 		} else {
-		// 			LCD_draw_string("     ");
-		// 		}
-		// 	} else { // stabilizing voltage
-		// 		LCD_draw_string("STABL");
-		// 	}
-		// }
+		//refreshflags |= REFRESH_CNTX;
 
-		// adjustment rulers
-		/*if (refresh & (REFRESH_ADJV | REFRESH_ADJC)) {
-			DrawRulersH(
-				((msmmode == MSMMODE_ADJV) && (refresh & REFRESH_FLSV)) ? 0 : adjv,
-				((msmmode == MSMMODE_ADJC) && (refresh & REFRESH_FLSV)) ? 0 : adjc);
-		}*/
-		refreshmask |= REFRESH_CNTX;
-
-		if (refreshmask & REFRESH_CNTX) {
+		if (refreshflags & REFRESH_CNTX) {
 			// draw time elapsed
-			FormatTime(buffer, lastmillis);
+			FormatTime(buffer, lastcount);
 			LCD_set_position(0 * 6, 7);
 			LCD_draw_string(buffer);
 
 			// draw discharged capacity
-			buffer[PutText(buffer, "mAh", FormatNumber(buffer + 0, capacity / 3600, 6, ' '))] = '\0';
-			//buffer[PutText(buffer, "mAh", FormatNumberW(buffer + 0, xxx, 6, ' '))] = '\0';
+			buffer[PutText(buffer, "mAh", FormatNumber(buffer, (capacity + 1800) / 3600, 6, ' '))] = '\0';
 			LCD_draw_string(buffer);
 
+			// draw current output state
 			LCD_set_position(0 * 6, 6);
 			LCD_draw_string(turnedon ? "ON " : "OFF");
 		}
 
 		if (s_lcd_mode & DISPLAY_RAWD) {
-			if (refreshmask & REFRESH_OUTV) { // outv value raw
+			if (refreshflags & REFRESH_OUTV) { // outv value raw
 				FormatNumber(buffer + 0, rawv, 4, '0');
+				//FormatNumber(buffer + 0, xxx, 4, '0');
 				buffer[4] = '\0';
 				LCD_set_position(0 * 6, 5);
 				LCD_draw_string(buffer);
 			}
-			if (refreshmask & REFRESH_OUTC) { // outc value raw
-				FormatNumber(buffer + 0, adjustimer ? adjc : rawc, 4, '0');
+			if (refreshflags & REFRESH_OUTC) { // outc value raw
+				FormatNumber(buffer + 0, adjustctd ? adjc : rawc, 4, '0');
 				buffer[4] = '\0';
 				LCD_set_position(12 * 6, 5);
 				LCD_draw_string(buffer);
 			}
-
-			/*if (refresh & REFRESH_ADJV) { // outv adjustment raw
-				FormatNumberW(buffer + 0, adjv, 4, '0');
-				buffer[4] = '\0';
-				LCD_set_position(0 * 6, 6);
-				LCD_draw_string(((msmmode == MSMMODE_ADJV) && (refresh & REFRESH_FLSV)) ? "    " : buffer);
-			}
-			if (refresh & REFRESH_ADJC) { // outc adjustment raw
-				FormatNumberW(buffer + 0, adjc, 4, '0');
-				buffer[4] = '\0';
-				LCD_set_position(12 * 6, 6);
-				LCD_draw_string(((msmmode == MSMMODE_ADJC) && (refresh & REFRESH_FLSV)) ? "    " : buffer);
-			}*/
 		}
 		
-		refreshmask = 0x00;
-
-		if (adjustimer) {
-			if (--adjustimer == 0) {
-				refreshmask = REFRESH_OUTC;
-				UI_Buzz(25);
-			}
-		}
-
-		// main screen control switch
-		switch (ScanKeys()) {
-			case KEY_OK:
-				if (g_mnu_keyhold > 20) {
-					ShowMenu_Options();
-					LCD_clear_screen();
-					refreshmask = REFRESH_OUTV | REFRESH_OUTC | REFRESH_ADJV | REFRESH_ADJC | REFRESH_CNTX;
-					UI_Buzz(50);
-				}
-				break;
-
-			case KEY_RELEASED_OK:
-				if (turnedon) {
-					turnedon = 0;
-					UI_Buzz(50);
-				}
-				else {
-					turnedon = 1;
-					g_mnu_mstimer = lastmillis = capacity = 0;
-					UI_Buzz(250);
-				}
-				refreshmask = REFRESH_CNTX;
-				break;
-
-			case KEY_UP:
-			case KEY_PRESSED_UP:
-				adjc = AcceleratedIncrement(adjc, 1000, 5, 25);
-				adjustimer = MSM_ADJDELAY;
-				refreshmask |= REFRESH_OUTC;
-				break;
-
-			case KEY_DN:
-			case KEY_PRESSED_DN:
-				adjc = AcceleratedDecrement(adjc, 0, 5, 25);
-				adjustimer = MSM_ADJDELAY;
-				refreshmask |= REFRESH_OUTC;
-				break;
-		}
-		
+		refreshflags = 0x00;
 		UI_Idle();
 	}
 }
+
+// lcd funcs rename
+// add W/h calc

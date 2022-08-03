@@ -49,7 +49,7 @@ volatile uint32_t g_mnu_mstimer = 0;
 
 ISR(TIMER0_OVF_vect) { // to adjust period modify TCNT0
 	static uint16_t msfrac; // intermediate fractions to mitigate timer 0xff overflow
-	msfrac += 0xFF;
+	msfrac += 0x100;
 	if (msfrac >= 500) {
 		msfrac -= 500;
 		g_mnu_mstimer++;
