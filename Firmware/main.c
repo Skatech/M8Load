@@ -336,8 +336,11 @@ int main() {
 					UI_Buzz(50);
 				}
 				else {
-					g_mnu_mstimer = lastcount = capacity = 0;
+					lastcount = capacity = 0;
 					turnedon = 1;
+					cli();
+					g_mnu_mstimer = 0;
+					sei();
 					UI_Buzz(250);
 				}
 				refreshflags |= REFRESH_CNTX;
@@ -365,14 +368,14 @@ int main() {
 			if (v != outv) {
 				outv = v;
 				rawv = (g_adcresv + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
-				refreshflags = refreshflags | REFRESH_OUTV;
+				refreshflags |= REFRESH_OUTV;
 			}
 
 			uint16_t c = (g_adcresc * s_adc_mapc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
 			if (c != outc) {
 				outc = c;
 				rawc = (g_adcresc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
-				refreshflags = refreshflags | REFRESH_OUTC;
+				refreshflags |= REFRESH_OUTC;
 			}
 
 			if (turnedon) {
@@ -387,7 +390,7 @@ int main() {
 			}
 		}
 
-		// turn off by input voltage low bound
+		// turn off on input voltage low bound
 		if (turnedon) {
 			if (s_off_vmin > outv) {
 				turnedon = 0;
@@ -403,13 +406,15 @@ int main() {
 
 		// release current set value indication
 		if (adjustctd) {
-			adjustctd--;
-			if (adjustctd == 0) {
+			if (--adjustctd == 0) {
 				refreshflags |= REFRESH_OUTC;
-				UI_Buzz(25);
+				UI_Buzz(50);
 			}
 		}
 
+		/////////////////////////
+		// Redraw UI
+		/////////////////////////
 		if (refreshflags & REFRESH_OUTV) {
 			LCD_set_position(1, 0);
 			LCD_draw_string("VOLTAGE");
@@ -421,6 +426,13 @@ int main() {
 				FormatADC3(buffer, outv, '\0');
 				LCD_DrawString14X32(buffer, 0, 1);
 			//}
+
+			if (s_lcd_mode & DISPLAY_RAWD) {
+				FormatNumber(buffer + 0, rawv, 4, '0');
+				buffer[4] = '\0';
+				LCD_set_position(0 * 6, 5);
+				LCD_draw_string(buffer);
+			}
 		}
 		if (refreshflags & REFRESH_OUTC) {
 			LCD_set_position(54, 0);
@@ -434,10 +446,16 @@ int main() {
 				FormatADC3(buffer, adjustctd ? adjc * s_adc_mapc : outc, '\0');
 				LCD_DrawString14X32(buffer, 50, 1);
 			//}
+
+			if (s_lcd_mode & DISPLAY_RAWD) {
+				FormatNumber(buffer + 0, adjustctd ? adjc : rawc, 4, '0');
+				buffer[4] = '\0';
+				LCD_set_position(12 * 6, 5);
+				LCD_draw_string(buffer);
+			}
 		}
 
-		//refreshflags |= REFRESH_CNTX;
-
+		// redraw time, capacity, on-off marker
 		if (refreshflags & REFRESH_CNTX) {
 			// draw time elapsed
 			FormatTime(buffer, lastcount);
@@ -451,22 +469,6 @@ int main() {
 			// draw current output state
 			LCD_set_position(0 * 6, 6);
 			LCD_draw_string(turnedon ? "ON " : "OFF");
-		}
-
-		if (s_lcd_mode & DISPLAY_RAWD) {
-			if (refreshflags & REFRESH_OUTV) { // outv value raw
-				FormatNumber(buffer + 0, rawv, 4, '0');
-				//FormatNumber(buffer + 0, xxx, 4, '0');
-				buffer[4] = '\0';
-				LCD_set_position(0 * 6, 5);
-				LCD_draw_string(buffer);
-			}
-			if (refreshflags & REFRESH_OUTC) { // outc value raw
-				FormatNumber(buffer + 0, adjustctd ? adjc : rawc, 4, '0');
-				buffer[4] = '\0';
-				LCD_set_position(12 * 6, 5);
-				LCD_draw_string(buffer);
-			}
 		}
 		
 		refreshflags = 0x00;
