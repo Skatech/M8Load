@@ -223,11 +223,11 @@ void LCD_initialize() {
 
 
 void LCD_draw_char_X2(char code, uint8_t xpos, uint8_t ypos) {
-  for (int b = 0; b < 2; b++) {    		
+  	for (int b = 0; b < 2; b++) {    		
 		LCD_set_position(xpos, ypos + b);
 
-	  for (int i = 0; i < 6; i++) {
-			uint8_t d = (pgm_read_byte(&font57[(code - 32) * 6 + i]) >> (b * 4));						
+	  	for (int i = 0; i < 6; i++) {
+			uint8_t d = (pgm_read_byte(&font57[(code - 32) * 6 + i]) >> (b * 4));
 
 			uint8_t m = 0x00;
 			if (d & 0x01) m |= 0x03;
@@ -238,8 +238,8 @@ void LCD_draw_char_X2(char code, uint8_t xpos, uint8_t ypos) {
 			for (int p = 0; p < 2; p++) {
 				LCD_send_data(m);
 			}
-	  }
-  }	
+		}
+  	}
 }
 
 void LCD_draw_string_X2(const char* text, uint8_t xpos, uint8_t ypos) {

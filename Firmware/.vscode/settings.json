@@ -6,6 +6,6 @@
     },
     "files.exclude": {
         "**/.vscode": false,
-	    "**/Makefile": false,
+        "**/Makefile": false,
     }    
 }

@@ -39,4 +39,7 @@
 #define DISPLAY_RAWD 0x04
 #define DISPLAY_DEFAULTS    DISPLAY_VREV | DISPLAY_RAWD
 
+// Number of readings to accumulate per ADC-channel before deliver, 0.416ms each reading (600 * 2-chan * 0.416ms = 0.5s)
+#define READINGS_TO_ACCUMULATE 600
+
 #define FIRMWARE_VERSION "2022.08.03 v0.54"

@@ -24,9 +24,12 @@
 extern uint16_t s_off_vmin;
 extern uint8_t s_lcd_mode, s_adc_mvpc, s_adc_mapc;
 
-// Menu system variables
 extern uint8_t g_mnu_keyhold;
 extern uint32_t g_mnu_mstimer;
+
+extern uint32_t g_adcsumv, g_adcsumc;
+extern uint8_t g_adcdeliveries;
+extern void ADC_Initialize();
 
 void SetDisplayMode(uint8_t mode) {
 	LCD_send_command((mode & DISPLAY_VREV) ? LCD8814_VREV_ON : LCD8814_VREV_OFF);
@@ -223,42 +226,6 @@ void ShowMenu_Options() {
 	}
 }
 
-// Number of readings to accumulate per ADC-channel before deliver, 0.416ms each reading
-#define READINGS_TO_ACCUMULATE 600 // 600 * 2ch * 0.416ms = 0.5s
-
-uint32_t g_adcresv = 0, g_adcresc = 0;  // ADC resulting summs from READINGS_TO_ACCUMULATE readings
-uint8_t g_adcdeliveries = 0; // ADC unprocessed deliveries counter
-
-// 7410 7428 ==> 7482
-//  uint16_t __div_rounded(uint32_t* value, uint16_t divider) {
-//  	return (uint16_t)(((*value) + (divider / 2)) / divider);
-//  }
-
-ISR(ADC_vect) {
-	static uint32_t adcaccv = 0, adcaccc = 0; // ADC readings accumulators
-	static uint16_t adcacccount = 0; // ADC accumulate readings counter
-	switch (ADMUX & (ADMUX_CHANNELV | ADMUX_CHANNELC)) {
-		case ADMUX_CHANNELV:
-			ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELC;
-			adcaccc += ADC;
-			break;
-
-		case ADMUX_CHANNELC:
-			ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELV;
-			adcaccv += ADC;
-			break;
-	}
-
-	if (++adcacccount == 2 * READINGS_TO_ACCUMULATE) {
-		g_adcresv = adcaccv;
-		g_adcresc = adcaccc;
-		g_adcdeliveries++;
-
-		adcacccount = 0x0000;
-		adcaccv = adcaccc = 0x00000000;
-	}
-}
-
 #define REFRESH_OUTV	0x01
 #define REFRESH_OUTC	0x02
 #define REFRESH_ADJV	0x04
@@ -311,10 +278,11 @@ int main() {
 	UI_Sleep(2000);
 	LCD_clear_screen();
 
-	// ADC setup Tconv = F_CPU / PRESCALE / 13 (2404 reads per sec)
-	ADCSRA = _BV(ADIE) | _BV(ADFR) | _BV(ADEN) | _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); // ADC interupt, free mode, ADC enabled, prescaler CK/128
-	ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELV; // reference 2.56V, input A0
-	ADCSRA |= (_BV(ADSC)); // start conversion
+	// // ADC setup Tconv = F_CPU / PRESCALE / 13 (2404 reads per sec)
+	// ADCSRA = _BV(ADIE) | _BV(ADFR) | _BV(ADEN) | _BV(ADPS0) | _BV(ADPS1) | _BV(ADPS2); // ADC interupt, free mode, ADC enabled, prescaler CK/128
+	// ADMUX = ADMUX_REFSOURCE | ADMUX_CHANNELV; // reference 2.56V, input A0
+	// ADCSRA |= (_BV(ADSC)); // start conversion
+	ADC_Initialize();
 
 	//PWM initialization (Fast PWM, 10-bit) ?? OCR1A OCR1B
     DDRB = DDRB | (_BV(DDB1) | _BV(DDB2)); //OC1A, OC1B direction output
@@ -368,17 +336,17 @@ int main() {
 		if (g_adcdeliveries) {
 			g_adcdeliveries = 0x00;
 
-			uint16_t v = (g_adcresv * s_adc_mvpc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+			uint16_t v = (g_adcsumv * s_adc_mvpc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
 			if (v != outv) {
 				outv = v;
-				rawv = (g_adcresv + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+				rawv = (g_adcsumv + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
 				refreshflags |= REFRESH_OUTV;
 			}
 
-			uint16_t c = (g_adcresc * s_adc_mapc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+			uint16_t c = (g_adcsumc * s_adc_mapc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
 			if (c != outc) {
 				outc = c;
-				rawc = (g_adcresc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
+				rawc = (g_adcsumc + READINGS_TO_ACCUMULATE / 2) / READINGS_TO_ACCUMULATE;
 				refreshflags |= REFRESH_OUTC;
 			}
 

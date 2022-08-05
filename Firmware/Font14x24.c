@@ -62,8 +62,7 @@ static uint8_t __fontH3[] PROGMEM = {
 	0x60,0x60/*,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,*/
 };
 
-uint8_t LCD_DrawChar14X24(char code, uint8_t xpos, uint8_t ypos)
-{
+uint8_t LCD_DrawChar14X24(char code, uint8_t xpos, uint8_t ypos) {
 	uint16_t offs;
 	uint8_t wdth;
 
@@ -97,11 +96,9 @@ uint8_t LCD_DrawChar14X24(char code, uint8_t xpos, uint8_t ypos)
 			return xpos;
 	}
 
-  	for (uint8_t b = 0; b < 3; b++)
-  	{
+  	for (uint8_t b = 0; b < 3; b++) {
 		LCD_set_position(xpos, ypos + b);
-	  	for (uint8_t i = 0; i < wdth; i++)
-	  	{
+	  	for (uint8_t i = 0; i < wdth; i++) {
 			LCD_send_data(pgm_read_byte(&__fontH3[offs + b * wdth + i]));
 		}
 		LCD_send_data(0);
@@ -110,10 +107,8 @@ uint8_t LCD_DrawChar14X24(char code, uint8_t xpos, uint8_t ypos)
 	return xpos + wdth + 2;
 }
 
-void LCD_DrawString14X24(const char* text, uint8_t xpos, uint8_t ypos)
-{
-	for (uint8_t i = 0; text[i]; i++)
-	{
+void LCD_DrawString14X24(const char* text, uint8_t xpos, uint8_t ypos) {
+	for (uint8_t i = 0; text[i]; i++) {
 		xpos = LCD_DrawChar14X24(text[i], xpos, ypos);
 	}
 }

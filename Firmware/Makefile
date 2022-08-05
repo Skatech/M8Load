@@ -2,7 +2,7 @@ PROJECT = M8Load
 MCU = atmega8
 CLOCK = 4000000UL
 SRCDIR = 
-OUTDIR = ../Proteus/.firm/
+OUTDIR = ../.out/
 CC = avr-gcc
 CFLAGS = -mmcu=$(MCU) -DF_CPU=$(CLOCK) -Wall -gdwarf-2 -std=gnu99 -Os -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
 DFLAGS = -MMD -MP -MF $(OUTDIR)obj/dep/$(@F).d
