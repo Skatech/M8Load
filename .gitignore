@@ -1,9 +1,3 @@
-Firmware/*.o
-Firmware/*.eep
-Firmware/*.elf
-Firmware/*.hex
-Firmware/*.lss
-Firmware/*.map
-Firmware/dep/
+Proteus/.firm
 Proteus/*.pdsbak
 Proteus/*.workspace
