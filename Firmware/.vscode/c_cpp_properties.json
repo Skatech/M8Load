@@ -6,12 +6,12 @@
             "intelliSenseMode": "gcc-x64",
             "cStandard": "c11", 
             "includePath": [
-		        "${workspaceFolder}",
+                "${workspaceFolder}",
                 "${PROGRAMFILES(x86)}/Atmel/Toolchain/avr/include/",
                 "${PROGRAMFILES(x86)}/Atmel/Toolchain/avr/include/avr/",
                 "${PROGRAMFILES(x86)}/Atmel/Toolchain/avr/include/compat/",
                 "${PROGRAMFILES(x86)}/Atmel/Toolchain/avr/include/util/",
-		        "${PROGRAMFILES(x86)}/Atmel/Toolchain/lib/gcc/avr/4.5.1/include/"
+                "${PROGRAMFILES(x86)}/Atmel/Toolchain/lib/gcc/avr/4.5.1/include/"
             ],
             "defines": [
                 "__AVR_ATmega8__",

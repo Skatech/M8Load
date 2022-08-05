@@ -16,7 +16,7 @@
 #define KEYBOARD_PIN_DN	PD7
 
 // connection details of buzzer
-#define BUZZER_PORT	    PORTB
+#define BUZZER_PORT     PORTB
 #define BUZZER_DDRS     DDRB
 #define BUZZER_PIN      PB0
 
@@ -30,8 +30,8 @@
 
 // ADC configuration
 #define ADMUX_REFSOURCE _BV(REFS0) | _BV(REFS1)
-#define ADMUX_CHANNELV _BV(MUX1) | _BV(MUX2)
-#define ADMUX_CHANNELC _BV(MUX0) | _BV(MUX1) | _BV(MUX2)
+#define ADMUX_CHANNELV  _BV(MUX1) | _BV(MUX2)
+#define ADMUX_CHANNELC  _BV(MUX0) | _BV(MUX1) | _BV(MUX2)
 
 // display mode flags
 #define DISPLAY_VREV 0x01

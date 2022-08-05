@@ -1,4 +1,8 @@
-//#define SIMULATION
+/******************************************************************************
+ * (c) Skatech Research Lab, 2000-2022.
+ * Last change: 2022.08.05
+ * Electronic Load controller based on ATmega8 and LCD Nokia1110i 
+ *****************************************************************************/
 
 #include <avr\io.h>
 #include <avr\interrupt.h>
