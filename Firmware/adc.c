@@ -6,7 +6,7 @@
 
 #include <avr\io.h>
 #include <avr\interrupt.h>
-#include "config.h"
+#include "adc.h"
 
 #ifndef ADMUX_REFSOURCE
 	#error ADMUX_REFSOURCE must be defined in configuration file

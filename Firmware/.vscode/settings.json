@@ -2,7 +2,8 @@
     "terminal.integrated.defaultProfile.windows": "Command Prompt",
     "files.associations": {
         "io.h": "c",
-        "eeprom.h": "c"
+        "eeprom.h": "c",
+        "adc.h": "c"
     },
     "files.exclude": {
         "**/.vscode": false,

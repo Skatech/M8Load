@@ -21,6 +21,9 @@
 
 #define KEY_POLL_DELAY  50	// Period in milliseconds between key polls and screen updates
 
+extern uint8_t g_mnu_keyhold;
+extern volatile uint32_t g_mnu_mstimer;
+
 // Intializes system peripherials: keyborad, buzzer, timer
 void UI_Initialize();
 // Freezes execution for period in milliseconds
